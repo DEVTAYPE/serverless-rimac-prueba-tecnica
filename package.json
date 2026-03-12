@@ -3,15 +3,23 @@
   "version": "1.0.0",
   "type": "module",
   "description": "",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:dev": "serverless deploy --stage dev",
+    "build": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\""
+  },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1008.0",
     "@aws-sdk/client-sns": "^3.1008.0",
     "@aws-sdk/lib-dynamodb": "^3.1008.0",
+    "aws-lambda": "^1.0.7",
     "express": "^4.19.2",
     "serverless-http": "^3.2.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
     "@types/node": "^25.5.0",
     "typescript": "^5.9.3"
   }

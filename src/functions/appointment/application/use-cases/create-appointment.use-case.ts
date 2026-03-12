@@ -40,7 +40,7 @@ export class CreateAppointmentUseCase {
       appointment_id,
       insured_id: request.insured_id,
       schedule_id: request.schedule_id,
-      country_id: request.country_iso,
+      country_iso: request.country_iso,
     });
 
     return {

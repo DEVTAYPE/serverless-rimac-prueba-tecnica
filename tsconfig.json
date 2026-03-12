@@ -1,8 +1,8 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
+  "include": ["./src/**/*"],
+  "exclude": ["node_modules", "./build", "**/*.test.ts"],
   "compilerOptions": {
-    "include": ["./src/**/*"],
-    "exclude": ["node_modules", "./build", "**/*.test.ts"],
     "paths": {
       "@shared/*": ["./src/shared/*"]
     },

@@ -24,3 +24,6 @@ npx tsc --init
 pnpm add uuid
 
 @aws-sdk/client-sns
+
+aws-lambda
+@types/aws-lambda
