@@ -1,6 +1,7 @@
 {
   "name": "serverless-rimac-prueba-tecnica",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "dependencies": {
     "express": "^4.19.2",
