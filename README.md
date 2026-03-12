@@ -27,3 +27,6 @@ pnpm add uuid
 
 aws-lambda
 @types/aws-lambda
+
+mysql2
+@aws-sdk/client-eventbridge
