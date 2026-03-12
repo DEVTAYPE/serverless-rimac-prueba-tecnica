@@ -5,5 +5,8 @@
   "dependencies": {
     "express": "^4.19.2",
     "serverless-http": "^3.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }
