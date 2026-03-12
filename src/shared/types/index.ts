@@ -31,3 +31,11 @@ export interface IAppointmentMessage {
   schedule_id: number;
   country_iso: TCountryISO;
 }
+
+//  Evento publicado a EventBridge por appointment_pe / appointment_cl
+export interface IAppointmentConfirmedEvent {
+  appointment_id: string;
+  insured_id: string;
+  country_iso: TCountryISO;
+  confirmed_at: string;
+}
