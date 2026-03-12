@@ -6,10 +6,10 @@ export class Appointment {
     public readonly appointment_id: string,
     public readonly insured_id: string,
     public readonly schedule_id: number,
-    public readonly country_ISO: TCountryISO,
+    public readonly country_iso: TCountryISO,
     public status: TAppointmentStatus, // Se deja sin readonly para poder actualizar el estado del agendamiento
-    public readonly created_at: Date,
-    public updated_at: Date,
+    public readonly created_at: string,
+    public updated_at: string,
   ) {}
 
   // para crear un nuevo agendamiento, con estado pending
@@ -17,14 +17,15 @@ export class Appointment {
     appointment_id: string,
     insured_id: string,
     schedule_id: number,
-    country_ISO: TCountryISO,
+    country_iso: TCountryISO,
   ): Appointment {
-    const now = new Date();
+    const now = new Date().toISOString();
+
     return new Appointment(
       appointment_id,
       insured_id,
       schedule_id,
-      country_ISO,
+      country_iso,
       "pending",
       now,
       now,
@@ -34,6 +35,6 @@ export class Appointment {
   // para completar un agendamiento
   complete(): void {
     this.status = "completed";
-    this.updated_at = new Date();
+    this.updated_at = new Date().toISOString();
   }
 }
