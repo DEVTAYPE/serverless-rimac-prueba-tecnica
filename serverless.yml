@@ -3,7 +3,7 @@ org: juantaype
 # "app" enables Serverless Framework Dashboard features and sharing them with other Services.
 app: serverless-rimac-prueba-tecnica
 # "service" is the name of this project. This will also be added to your AWS resource names.
-service: serverless-rimac-prueba-tecnica
+service: rimac-appointment
 
 provider:
   name: aws
