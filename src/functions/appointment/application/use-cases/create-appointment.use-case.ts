@@ -1,4 +1,7 @@
+import { v4 as uuidv4 } from "uuid";
 import { ICreateAppointmentRequest } from "@shared/types";
+import { Appointment } from "@shared/domain/appointment";
+import { IAppointmentRepository } from "@shared/ports/appointment.repository";
 
 export interface ICreateAppointmentResponse {
   appointment_id: string;
@@ -7,14 +10,39 @@ export interface ICreateAppointmentResponse {
 }
 
 export class CreateAppointmentUseCase {
-  execute(
+  constructor(
+    private readonly appointmentRepository: IAppointmentRepository,
+
+    // TODO: recibir publisher de eventos
+  ) {}
+
+  async execute(
     request: ICreateAppointmentRequest,
   ): Promise<ICreateAppointmentResponse> {
     // 1. Validar el payload de entrada
     this.validate(request);
 
-    // todo: implementar mas logica
-    throw new Error("Method not implemented.");
+    const appointment_id = uuidv4(); // Generar un ID único para el agendamiento
+
+    // Crear objeto de dominio Appointment
+    const appointment = Appointment.create(
+      appointment_id,
+      request.insured_id,
+      request.schedule_id,
+      request.country_iso,
+      // Por defecto tiene estado pending
+    );
+
+    // Guardar el agendamiento
+    this.appointmentRepository.save(appointment);
+
+    // todo: publicar evento
+
+    return Promise.resolve({
+      appointment_id,
+      status: appointment.status,
+      message: "Agendamiento en proceso",
+    });
   }
 
   //  Validaciones de dominio básicas.
