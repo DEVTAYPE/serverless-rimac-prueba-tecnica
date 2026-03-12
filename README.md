@@ -17,3 +17,6 @@ pnpm add -D typescript
 inicializar typescript
 
 npx tsc --init
+
+@aws-sdk/client-dynamodb
+@aws-sdk/lib-dynamodb

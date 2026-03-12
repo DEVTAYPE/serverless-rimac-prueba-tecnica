@@ -4,10 +4,13 @@
   "type": "module",
   "description": "",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1008.0",
+    "@aws-sdk/lib-dynamodb": "^3.1008.0",
     "express": "^4.19.2",
     "serverless-http": "^3.2.0"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "typescript": "^5.9.3"
   }
 }
