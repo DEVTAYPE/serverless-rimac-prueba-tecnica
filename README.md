@@ -22,3 +22,5 @@ npx tsc --init
 @aws-sdk/lib-dynamodb
 
 pnpm add uuid
+
+@aws-sdk/client-sns

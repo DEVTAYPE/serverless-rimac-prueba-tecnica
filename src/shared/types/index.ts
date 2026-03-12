@@ -29,5 +29,5 @@ export interface IAppointmentMessage {
   appointment_id: string;
   insured_id: string;
   schedule_id: number;
-  country_id: TCountryISO;
+  country_iso: TCountryISO;
 }
