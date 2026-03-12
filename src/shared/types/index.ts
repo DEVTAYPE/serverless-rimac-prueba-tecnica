@@ -21,3 +21,13 @@ export interface ICreateAppointmentRequest {
   schedule_id: number;
   country_iso: TCountryISO;
 }
+
+// Mensaje publicado al tópico SNS.
+// El atributo countryISO es usado como filtro de suscripción:
+//   PE → SQS_PE | CL → SQS_CL
+export interface IAppointmentMessage {
+  appointment_id: string;
+  insured_id: string;
+  schedule_id: number;
+  country_id: TCountryISO;
+}

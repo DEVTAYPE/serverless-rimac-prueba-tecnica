@@ -1,7 +1,8 @@
-import { v4 as uuidv4 } from "uuid";
-import { ICreateAppointmentRequest } from "@shared/types";
 import { Appointment } from "@shared/domain/appointment";
 import { IAppointmentRepository } from "@shared/ports/appointment.repository";
+import { IEventPublisher } from "@shared/ports/event.publisher";
+import { ICreateAppointmentRequest } from "@shared/types";
+import { v4 as uuidv4 } from "uuid";
 
 export interface ICreateAppointmentResponse {
   appointment_id: string;
@@ -12,8 +13,7 @@ export interface ICreateAppointmentResponse {
 export class CreateAppointmentUseCase {
   constructor(
     private readonly appointmentRepository: IAppointmentRepository,
-
-    // TODO: recibir publisher de eventos
+    private readonly eventPublisher: IEventPublisher,
   ) {}
 
   async execute(
@@ -36,13 +36,18 @@ export class CreateAppointmentUseCase {
     // Guardar el agendamiento
     this.appointmentRepository.save(appointment);
 
-    // todo: publicar evento
+    await this.eventPublisher.publish({
+      appointment_id,
+      insured_id: request.insured_id,
+      schedule_id: request.schedule_id,
+      country_id: request.country_iso,
+    });
 
-    return Promise.resolve({
+    return {
       appointment_id,
       status: appointment.status,
       message: "Agendamiento en proceso",
-    });
+    };
   }
 
   //  Validaciones de dominio básicas.

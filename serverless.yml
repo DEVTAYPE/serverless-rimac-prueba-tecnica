@@ -8,12 +8,253 @@ service: rimac-appointment
 provider:
   name: aws
   runtime: nodejs20.x
-  # Uncomment to easily set up a custom domain. Read the docs for more details:
-  # https://www.serverless.com/framework/docs/providers/aws/guide/domains
-  # domain: api.example.com
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    DYNAMODB_TABLE: ${self:service}-appointments-${self:provider.stage}
+    SNS_TOPIC_ARN: !Ref AppointmentTopic
+    SQS_CONFIRMATION_URL: !Ref AppointmentConfirmationQueue
+    SQS_PE_URL: !Ref AppointmentQueuePE
+    SQS_CL_URL: !Ref AppointmentQueueCL
 
-functions:
-  api:
-    handler: handler.handler
-    events:
-      - httpApi: "*"
+  iam:
+    role:
+      statements:
+        # DynamoDB
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - !GetAtt AppointmentsTable.Arn
+            - !Sub "${AppointmentsTable.Arn}/index/*"
+        # SNS
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource: !Ref AppointmentTopic
+        # SQS
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource:
+            - !GetAtt AppointmentQueuePE.Arn
+            - !GetAtt AppointmentQueueCL.Arn
+            - !GetAtt AppointmentConfirmationQueue.Arn
+        # EventBridge
+        - Effect: Allow
+          Action:
+            - events:PutEvents
+          Resource: !Sub "arn:aws:events:${self:provider.region}:*:event-bus/default"
+
+plugins:
+  - serverless-esbuild # Utiliza esbuild para empaquetar el código de la función Lambda
+
+custom:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+    # AWS SDK v3 está disponible en el runtime de Node 20 en Lambda
+    exclude:
+      - "@aws-sdk/*"
+
+# List de funciones Lambda que necesitamos
+# appointment (POST /appointments + SQS consumer)
+# appointment (GET /appointments/{insuredId})
+# appointment-pe / appointment-cl (SQS consumers + MySQL)
+# appointment (SQS confirmation consumer → DynamoDB update)
+functions: {}
+
+resources:
+  Resources:
+    # DynamoDB - Tabla principal de agendamientos
+    # Partition key: appointmentId (UUID)
+    # GSI: insuredId-index para consultas por asegurado
+    AppointmentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE} #Nombre de tabla dinámico por stage
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: appointmentId
+            AttributeType: S
+          - AttributeName: insuredId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: appointmentId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: insuredId-index
+            KeySchema:
+              - AttributeName: insuredId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    # SNS - Tópico central con filtro por countryISO
+    # PE → SQS_PE | CL → SQS_CL
+    AppointmentTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-topic-${self:provider.stage}
+        DisplayName: Rimac Appointment Topic
+
+    # SQS - Perú
+    AppointmentQueuePE:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-sqs-pe-${self:provider.stage}
+        VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt AppointmentQueuePEDLQ.Arn
+          maxReceiveCount: 3
+          # TODO: Implementar lógica de manejo de fallos y reintentos con DLQ
+
+    AppointmentQueuePEDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-sqs-pe-dlq-${self:provider.stage}
+
+    # Suscripción SNS → SQS PE con filtro por país
+    AppointmentSNSSubscriptionPE:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref AppointmentTopic
+        Protocol: sqs
+        Endpoint: !GetAtt AppointmentQueuePE.Arn
+        FilterPolicy:
+          countryISO:
+            - PE
+
+    AppointmentQueuePEPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref AppointmentQueuePE
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt AppointmentQueuePE.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref AppointmentTopic
+
+    # SQS - Chile
+    AppointmentQueueCL:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-sqs-cl-${self:provider.stage}
+        VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt AppointmentQueueCLDLQ.Arn
+          maxReceiveCount: 3
+          # TODO: Implementar lógica de manejo de fallos y reintentos con DLQ
+
+    AppointmentQueueCLDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-sqs-cl-dlq-${self:provider.stage}
+
+    # Suscripción SNS → SQS CL con filtro por país
+    AppointmentSNSSubscriptionCL:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref AppointmentTopic
+        Protocol: sqs
+        Endpoint: !GetAtt AppointmentQueueCL.Arn
+        FilterPolicy:
+          countryISO:
+            - CL
+
+    AppointmentQueueCLPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref AppointmentQueueCL
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: sns.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt AppointmentQueueCL.Arn
+              Condition:
+                ArnEquals:
+                  aws:SourceArn: !Ref AppointmentTopic
+
+    # SQS - Confirmación (recibe eventos de EventBridge)
+    AppointmentConfirmationQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-sqs-confirmation-${self:provider.stage}
+        VisibilityTimeout: 60
+
+    # EventBridge - Regla para evento AppointmentConfirmed
+    # appointment_pe / appointment_cl → EventBridge → SQS → appointment
+    AppointmentConfirmedRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Name: ${self:service}-appointment-confirmed-${self:provider.stage}
+        EventBusName: default
+        EventPattern:
+          source:
+            - rimac.appointment
+          detail-type:
+            - AppointmentConfirmed
+        State: ENABLED
+        Targets:
+          - Arn: !GetAtt AppointmentConfirmationQueue.Arn
+            Id: AppointmentConfirmationQueueTarget
+
+    AppointmentConfirmationQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues:
+          - !Ref AppointmentConfirmationQueue
+        PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: events.amazonaws.com
+              Action: sqs:SendMessage
+              Resource: !GetAtt AppointmentConfirmationQueue.Arn
+
+  Outputs:
+    AppointmentsTableName:
+      Value: !Ref AppointmentsTable
+      Export:
+        Name: ${self:service}-${self:provider.stage}-AppointmentsTableName
+
+    AppointmentTopicArn:
+      Value: !Ref AppointmentTopic
+      Export:
+        Name: ${self:service}-${self:provider.stage}-AppointmentTopicArn
+
+    AppointmentQueuePEUrl:
+      Value: !Ref AppointmentQueuePE
+      Export:
+        Name: ${self:service}-${self:provider.stage}-AppointmentQueuePEUrl
+
+    AppointmentQueueCLUrl:
+      Value: !Ref AppointmentQueueCL
+      Export:
+        Name: ${self:service}-${self:provider.stage}-AppointmentQueueCLUrl
+
+    AppointmentConfirmationQueueUrl:
+      Value: !Ref AppointmentConfirmationQueue
+      Export:
+        Name: ${self:service}-${self:provider.stage}-AppointmentConfirmationQueueUrl
