@@ -5,5 +5,5 @@ import { Appointment } from "@shared/domain/appointment";
 */
 export interface IScheduleRepository {
   // Guarda agendamiento en su db correspondiente
-  save(appointment: Appointment): Promise<void>;
+  saveSchedule(appointment: Appointment): Promise<void>;
 }
