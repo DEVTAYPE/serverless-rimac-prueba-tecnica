@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { GetAppointmentsByInsuredUseCase } from "../../application/use-cases/get-appointments-by-insured.use-case";
-import { DynamoAppointmentRepository } from "../../repositories/dynamo-appointment.repository";
+import { DynamoAppointmentRepository } from "../repositories/dynamo-appointment.repository";
 
 // Instanciación de caso de uso con su repositorio concreto (DynamoDB).
 const repository = new DynamoAppointmentRepository();
@@ -31,7 +31,7 @@ export const handler = async (
       error instanceof Error ? error.message : "Error interno del servidor";
 
     const isValidationError =
-      error instanceof Error && message.includes("insuredId");
+      error instanceof Error && message.includes("insured_id");
 
     return buildResponse(isValidationError ? 400 : 500, { message });
   }
