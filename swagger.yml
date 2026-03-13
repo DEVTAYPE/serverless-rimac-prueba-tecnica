@@ -1,0 +1,320 @@
+openapi: "3.0.3"
+
+info:
+  title: Rimac Appointment API
+  description: |
+    API REST para el agendamiento de citas médicas de asegurados RIMAC.
+    Permite crear y consultar agendamientos para Perú (PE) y Chile (CL).
+
+    ## Arquitectura
+    El sistema utiliza procesamiento asíncrono mediante SNS + SQS + EventBridge.
+    Al crear un agendamiento, la respuesta es **202 Accepted** — el estado definitivo
+    (`completed`) se actualiza una vez que el servicio país confirma el registro en su
+    base de datos MySQL.
+
+    ## Flujo de estados
+    ```
+    POST /appointments  →  status: pending  →  (procesamiento async)  →  status: completed
+    ```
+  version: "1.0.0"
+  contact:
+    name: RIMAC Seguros
+    url: https://www.rimac.com
+
+servers:
+  - url: https://ss4lktwio5.execute-api.us-east-1.amazonaws.com/dev
+    # - url: https://{apiId}.execute-api.{region}.amazonaws.com/{stage}
+    description: AWS API Gateway
+    variables:
+      apiId:
+        default: xxxxxxxxxx
+        description: ID del API Gateway generado en el despliegue
+      region:
+        default: us-east-1
+        description: Región AWS
+      stage:
+        default: dev
+        description: Etapa de despliegue
+
+tags:
+  - name: Appointments
+    description: Operaciones de agendamiento de citas médicas
+
+paths:
+  /appointments:
+    post:
+      tags:
+        - Appointments
+      summary: Crear un agendamiento de cita médica
+      description: |
+        Registra una nueva solicitud de agendamiento para un asegurado.
+
+        La operación es **asíncrona**: el sistema acepta la solicitud con `202 Accepted`,
+        guarda el registro en DynamoDB con estado `pending` y publica un mensaje SNS
+        filtrado por `countryISO` para que el servicio del país correspondiente procese
+        el agendamiento en su base de datos MySQL.
+
+        Una vez confirmado por el servicio país, el estado se actualiza a `completed`
+        en DynamoDB.
+      operationId: createAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAppointmentRequest"
+            examples:
+              peru:
+                summary: Agendamiento para Perú
+                value:
+                  insuredId: "00123"
+                  scheduleId: 1
+                  countryISO: "PE"
+              chile:
+                summary: Agendamiento para Chile
+                value:
+                  insuredId: "00456"
+                  scheduleId: 7
+                  countryISO: "CL"
+      responses:
+        "202":
+          description: Agendamiento aceptado y pendiente de confirmación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAppointmentResponse"
+              example:
+                appointmentId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                status: "pending"
+                message: "Agendamiento en proceso"
+        "400":
+          description: Parámetros de entrada inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingBody:
+                  summary: Body ausente
+                  value:
+                    message: "Body es requerido"
+                    statusCode: 400
+                invalidInsuredId:
+                  summary: insuredId con formato incorrecto
+                  value:
+                    message: "insuredId debe ser un código de 5 dígitos"
+                    statusCode: 400
+                missingField:
+                  summary: Campo requerido ausente
+                  value:
+                    message: "insuredId, scheduleId y countryISO son requeridos"
+                    statusCode: 400
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Internal server error"
+                statusCode: 500
+
+  /appointments/{insuredId}:
+    get:
+      tags:
+        - Appointments
+      summary: Listar agendamientos de un asegurado
+      description: |
+        Retorna todos los agendamientos registrados para el `insuredId` especificado,
+        ordenados de más reciente a más antiguo. Incluye tanto los pendientes como los
+        completados.
+      operationId: getAppointmentsByInsured
+      parameters:
+        - name: insuredId
+          in: path
+          required: true
+          description: Código identificador del asegurado (5 dígitos numéricos)
+          schema:
+            type: string
+            pattern: "^\\d{5}$"
+            example: "00123"
+      responses:
+        "200":
+          description: Lista de agendamientos del asegurado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetAppointmentsResponse"
+              example:
+                insuredId: "00123"
+                appointments:
+                  - appointmentId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                    insuredId: "00123"
+                    scheduleId: 1
+                    countryISO: "PE"
+                    status: "completed"
+                    createdAt: "2026-03-12T10:00:00.000Z"
+                    updatedAt: "2026-03-12T10:05:00.000Z"
+                  - appointmentId: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                    insuredId: "00123"
+                    scheduleId: 3
+                    countryISO: "PE"
+                    status: "pending"
+                    createdAt: "2026-03-12T11:00:00.000Z"
+                    updatedAt: "2026-03-12T11:00:00.000Z"
+        "400":
+          description: Parámetro insuredId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing:
+                  summary: insuredId ausente
+                  value:
+                    message: "insuredId es requerido"
+                    statusCode: 400
+                invalid:
+                  summary: insuredId con formato incorrecto
+                  value:
+                    message: "insuredId debe ser un código de 5 dígitos"
+                    statusCode: 400
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                message: "Internal server error"
+                statusCode: 500
+
+components:
+  schemas:
+    CreateAppointmentRequest:
+      type: object
+      required:
+        - insuredId
+        - scheduleId
+        - countryISO
+      properties:
+        insuredId:
+          type: string
+          description: Código identificador del asegurado (5 dígitos)
+          pattern: "^\\d{5}$"
+          example: "00123"
+        scheduleId:
+          type: integer
+          description: Identificador del horario de atención seleccionado
+          minimum: 1
+          example: 1
+        countryISO:
+          type: string
+          description: Código ISO del país del asegurado
+          enum:
+            - PE
+            - CL
+          example: "PE"
+
+    CreateAppointmentResponse:
+      type: object
+      required:
+        - appointmentId
+        - status
+        - message
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+          description: Identificador único del agendamiento (UUID v4)
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        status:
+          type: string
+          description: Estado del agendamiento al momento de la creación
+          enum:
+            - pending
+          example: "pending"
+        message:
+          type: string
+          description: Mensaje descriptivo del resultado
+          example: "Agendamiento en proceso"
+
+    AppointmentItem:
+      type: object
+      required:
+        - appointmentId
+        - insuredId
+        - scheduleId
+        - countryISO
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+          description: Identificador único del agendamiento
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        insuredId:
+          type: string
+          description: Código del asegurado
+          example: "00123"
+        scheduleId:
+          type: integer
+          description: Identificador del horario
+          example: 1
+        countryISO:
+          type: string
+          description: País del asegurado
+          enum:
+            - PE
+            - CL
+          example: "PE"
+        status:
+          type: string
+          description: Estado actual del agendamiento
+          enum:
+            - pending
+            - completed
+          example: "completed"
+        createdAt:
+          type: string
+          format: date-time
+          description: Fecha/hora de creación en UTC (ISO 8601)
+          example: "2026-03-12T10:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Fecha/hora de última actualización en UTC (ISO 8601)
+          example: "2026-03-12T10:05:00.000Z"
+
+    GetAppointmentsResponse:
+      type: object
+      required:
+        - insuredId
+        - appointments
+      properties:
+        insuredId:
+          type: string
+          description: Código del asegurado consultado
+          example: "00123"
+        appointments:
+          type: array
+          description: Lista de agendamientos del asegurado
+          items:
+            $ref: "#/components/schemas/AppointmentItem"
+
+    ErrorResponse:
+      type: object
+      required:
+        - message
+        - statusCode
+      properties:
+        message:
+          type: string
+          description: Descripción del error
+          example: "insuredId debe ser un código de 5 dígitos"
+        statusCode:
+          type: integer
+          description: Código HTTP del error
+          example: 400
