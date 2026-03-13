@@ -30,3 +30,10 @@ aws-lambda
 
 mysql2
 @aws-sdk/client-eventbridge
+
+jest
+@types/jest
+ts-jest
+pnpm create jest
+
+pnpm add -D ts-node
