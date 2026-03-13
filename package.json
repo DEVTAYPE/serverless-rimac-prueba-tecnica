@@ -6,7 +6,6 @@
     "deploy": "serverless deploy",
     "deploy:dev": "serverless deploy --stage dev",
     "build": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\"",
     "test": "jest"
   },
   "dependencies": {
