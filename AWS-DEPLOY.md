@@ -218,18 +218,20 @@ npx serverless deploy --stage dev
 Salida esperada al terminar (~250 segundos):
 
 ```
-✔ Service deployed to stack rimac-appointment-dev (253s)
+Deploying "rimac-appointment" to stage "dev" (us-east-1)
+
+✔ Service deployed to stack rimac-appointment-dev (141s)
 
 endpoints:
-  POST - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/dev/appointments
-  GET  - https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/dev/appointments/{insuredId}
-
+  POST - https://gg2ztznfwh.execute-api.us-east-1.amazonaws.com/dev/appointments
+  GET - https://gg2ztznfwh.execute-api.us-east-1.amazonaws.com/dev/appointments/{insuredId}
 functions:
-  appointmentCreate: rimac-appointment-dev-appointmentCreate (2.1 MB)
-  appointmentList:   rimac-appointment-dev-appointmentList (2.1 MB)
-  appointmentPe:     rimac-appointment-dev-appointmentPe (2.1 MB)
-  appointmentCl:     rimac-appointment-dev-appointmentCl (2.1 MB)
-  appointmentConfirmation: rimac-appointment-dev-appointmentConfirmation (2.1 MB)
+  appointmentCreate: rimac-appointment-dev-appointmentCreate (2 MB)
+  appointmentList: rimac-appointment-dev-appointmentList (2 MB)
+  appointmentPe: rimac-appointment-dev-appointmentPe (2 MB)
+  appointmentCl: rimac-appointment-dev-appointmentCl (2 MB)
+  appointmentConfirmation: rimac-appointment-dev-appointmentConfirmation (2 MB)
+
 ```
 
 > Guarda la URL base del API Gateway — la necesitarás para probar.

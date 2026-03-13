@@ -71,38 +71,131 @@ custom:
 
 # List de funciones Lambda que necesitamos
 # appointment (POST /appointments + SQS consumer)
-# appointment (GET /appointments/{insuredId})
+# appointment (GET /appointments/{insured_id})
 # appointment-pe / appointment-cl (SQS consumers + MySQL)
 # appointment (SQS confirmation consumer → DynamoDB update)
-functions: {}
+functions:
+  # ------------------------------------------------------------------
+  # Lambda: appointment
+  # HTTP POST /appointments — Registra la solicitud de agendamiento
+  # ------------------------------------------------------------------
+  appointmentCreate:
+    handler: src/functions/appointment/infrastructure/http/create-appointment.handler
+    description: "Registra un nuevo agendamiento médico (POST /appointments)"
+    events:
+      - http:
+          path: appointments
+          method: post
+          cors: true
+
+  # ------------------------------------------------------------------
+  # Lambda: appointment
+  # HTTP GET /appointments/{insuredId} — Lista agendamientos por asegurado
+  # ------------------------------------------------------------------
+  appointmentList:
+    handler: src/functions/appointment/infrastructure/http/get-appointments.handler
+    description: "Lista los agendamientos de un asegurado por insured_id (GET /appointments/{insuredId}) segun requerimiento"
+    events:
+      - http:
+          path: appointments/{insuredId}
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                insuredId: true
+
+  # ------------------------------------------------------------------
+  # Lambda: appointment_pe
+  # SQS consumer — Procesa agendamientos de Perú y guarda en MySQL PE
+  # ------------------------------------------------------------------
+  appointmentPe:
+    handler: src/functions/appointment-pe/infrastructure/sqs/appointment-pe.handler
+    description: "Procesa agendamientos de Perú desde SQS_PE y persiste en MySQL PE"
+    environment:
+      # LOCAL: usar variables de entorno del sistema (setear en terminal antes de npm run dev)
+      # DB_PE_HOST: ${env:DB_PE_HOST, ''}
+      # DB_PE_PORT: ${env:DB_PE_PORT, '3306'}
+      # DB_PE_USER: ${env:DB_PE_USER, ''}
+      # DB_PE_PASSWORD: ${env:DB_PE_PASSWORD, ''}
+      # DB_PE_NAME: ${env:DB_PE_NAME, ''}
+      # AWS: parámetros desde SSM Parameter Store
+      DB_PE_HOST: ${ssm:/rimac/${self:provider.stage}/DB_PE_HOST}
+      DB_PE_PORT: ${ssm:/rimac/${self:provider.stage}/DB_PE_PORT}
+      DB_PE_USER: ${ssm:/rimac/${self:provider.stage}/DB_PE_USER}
+      DB_PE_PASSWORD: ${ssm:/rimac/${self:provider.stage}/DB_PE_PASSWORD}
+      DB_PE_NAME: ${ssm:/rimac/${self:provider.stage}/DB_PE_NAME}
+    events:
+      - sqs:
+          arn: !GetAtt AppointmentQueuePE.Arn
+          batchSize: 1
+
+  # ------------------------------------------------------------------
+  # Lambda: appointment_cl
+  # SQS consumer — Procesa agendamientos de Chile y guarda en MySQL CL
+  # ------------------------------------------------------------------
+  appointmentCl:
+    handler: src/functions/appointment-cl/infrastructure/sqs/appointment-cl.handler
+    description: "Procesa agendamientos de Chile desde SQS_CL y persiste en MySQL CL"
+    environment:
+      # LOCAL: usar variables de entorno del sistema (setear en terminal antes de npm run dev)
+      # DB_CL_HOST: ${env:DB_CL_HOST, ''}
+      # DB_CL_PORT: ${env:DB_CL_PORT, '3306'}
+      # DB_CL_USER: ${env:DB_CL_USER, ''}
+      # DB_CL_PASSWORD: ${env:DB_CL_PASSWORD, ''}
+      # DB_CL_NAME: ${env:DB_CL_NAME, ''}
+      # AWS: parámetros desde SSM Parameter Store
+      DB_CL_HOST: ${ssm:/rimac/${self:provider.stage}/DB_CL_HOST}
+      DB_CL_PORT: ${ssm:/rimac/${self:provider.stage}/DB_CL_PORT}
+      DB_CL_USER: ${ssm:/rimac/${self:provider.stage}/DB_CL_USER}
+      DB_CL_PASSWORD: ${ssm:/rimac/${self:provider.stage}/DB_CL_PASSWORD}
+      DB_CL_NAME: ${ssm:/rimac/${self:provider.stage}/DB_CL_NAME}
+    events:
+      - sqs:
+          arn: !GetAtt AppointmentQueueCL.Arn
+          batchSize: 1
+
+  # ------------------------------------------------------------------
+  # Lambda: appointment (SQS consumer de confirmación)
+  # Consume SQS confirmation → actualiza DynamoDB a status=completed
+  # Cierra el ciclo completo del agendamiento (paso 6 del flujo)
+  # ------------------------------------------------------------------
+  appointmentConfirmation:
+    handler: src/functions/appointment/infrastructure/sqs/appointment-confirmation.handler
+    description: "Consume SQS de confirmación y actualiza el agendamiento a 'completed' en DynamoDB"
+    events:
+      - sqs:
+          arn: !GetAtt AppointmentConfirmationQueue.Arn
+          batchSize: 1
 
 resources:
   Resources:
     # DynamoDB - Tabla principal de agendamientos
-    # Partition key: appointmentId (UUID)
-    # GSI: insuredId-index para consultas por asegurado
+    # Partition key: appointment_id (UUID)
+    # GSI: insured_id-index para consultas por asegurado
     AppointmentsTable:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ${self:provider.environment.DYNAMODB_TABLE} #Nombre de tabla dinámico por stage
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
-          - AttributeName: appointmentId
+          - AttributeName: appointment_id
             AttributeType: S
-          - AttributeName: insuredId
+          - AttributeName: insured_id
             AttributeType: S
         KeySchema:
-          - AttributeName: appointmentId
+          - AttributeName: appointment_id
             KeyType: HASH
         GlobalSecondaryIndexes:
-          - IndexName: insuredId-index
+          - IndexName: insured_id-index
             KeySchema:
-              - AttributeName: insuredId
+              - AttributeName: insured_id
                 KeyType: HASH
             Projection:
               ProjectionType: ALL
 
-    # SNS - Tópico central con filtro por countryISO
+    # SNS - Tópico central con filtro por country_iso
+
     # PE → SQS_PE | CL → SQS_CL
     AppointmentTopic:
       Type: AWS::SNS::Topic
@@ -134,7 +227,7 @@ resources:
         Protocol: sqs
         Endpoint: !GetAtt AppointmentQueuePE.Arn
         FilterPolicy:
-          countryISO:
+          country_iso:
             - PE
 
     AppointmentQueuePEPolicy:
@@ -177,7 +270,7 @@ resources:
         Protocol: sqs
         Endpoint: !GetAtt AppointmentQueueCL.Arn
         FilterPolicy:
-          countryISO:
+          country_iso:
             - CL
 
     AppointmentQueueCLPolicy:
