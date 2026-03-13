@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.161",
     "@types/node": "^25.5.0",
+    "serverless-esbuild": "^1.57.0",
     "typescript": "^5.9.3"
   }
 }

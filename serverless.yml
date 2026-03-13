@@ -55,8 +55,8 @@ provider:
             - events:PutEvents
           Resource: !Sub "arn:aws:events:${self:provider.region}:*:event-bus/default"
 
-plugins:
-  - serverless-esbuild # Utiliza esbuild para empaquetar el código de la función Lambda
+# plugins:
+# - serverless-esbuild # ya soporta de froma nativa la v4
 
 custom:
   esbuild:

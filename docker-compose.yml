@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  localstack:
+    image: localstack/localstack:3
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,sns,sqs,events
+      - DEFAULT_REGION=us-east-1
+
+  mysql-pe:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: appointments_pe
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
+
+  mysql-cl:
+    image: mysql:8.0
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: appointments_cl
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
