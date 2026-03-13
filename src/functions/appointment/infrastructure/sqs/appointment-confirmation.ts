@@ -25,12 +25,27 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 };
 
 async function processRecord(record: SQSRecord): Promise<void> {
-  // EventBridge envuelve el evento al publicar en SQS:
-  // record.body = { "source": "rimac.appointment", "detail-type": "AppointmentConfirmed", "detail": {...} }
-  const eventBridgeWrapper = JSON.parse(record.body) as {
-    detail: IAppointmentConfirmedEvent;
-  };
-  const confirmedEvent = eventBridgeWrapper.detail;
+  try {
+    console.log("=== Mensaje recibido de SQS ===");
+    console.log(record.body);
 
-  await completeAppointmentUseCase.execute(confirmedEvent);
+    const body = JSON.parse(record.body);
+
+    // IMPORTANTE: EventBridge pone la data en 'detail'
+    const confirmedEvent = body.detail;
+
+    if (!confirmedEvent || !confirmedEvent.appointment_id) {
+      console.error("Error: El evento no tiene appointment_id", confirmedEvent);
+      return;
+    }
+
+    console.log("Ejecutando Use Case para ID:", confirmedEvent.appointment_id);
+    await completeAppointmentUseCase.execute(confirmedEvent);
+
+    console.log("Cita completada con éxito en DynamoDB");
+  } catch (error) {
+    console.error("Error procesando record de confirmación:", error);
+    // Re-lanzamos para que SQS sepa que falló
+    throw error;
+  }
 }

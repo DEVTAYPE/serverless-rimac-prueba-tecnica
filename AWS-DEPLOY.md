@@ -220,17 +220,18 @@ Salida esperada al terminar (~250 segundos):
 ```
 Deploying "rimac-appointment" to stage "dev" (us-east-1)
 
-✔ Service deployed to stack rimac-appointment-dev (141s)
+✔ Service deployed to stack rimac-appointment-dev (150s)
 
 endpoints:
-  POST - https://gg2ztznfwh.execute-api.us-east-1.amazonaws.com/dev/appointments
-  GET - https://gg2ztznfwh.execute-api.us-east-1.amazonaws.com/dev/appointments/{insuredId}
+  POST - https://ss4lktwio5.execute-api.us-east-1.amazonaws.com/dev/appointments
+  GET - https://ss4lktwio5.execute-api.us-east-1.amazonaws.com/dev/appointments/{insuredId}
 functions:
   appointmentCreate: rimac-appointment-dev-appointmentCreate (2 MB)
   appointmentList: rimac-appointment-dev-appointmentList (2 MB)
   appointmentPe: rimac-appointment-dev-appointmentPe (2 MB)
   appointmentCl: rimac-appointment-dev-appointmentCl (2 MB)
   appointmentConfirmation: rimac-appointment-dev-appointmentConfirmation (2 MB)
+
 
 ```
 
@@ -385,15 +386,6 @@ aws rds describe-db-instances \
 
 ---
 
-## URLs del despliegue actual
-
-| Endpoint                      | URL                                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------------------- |
-| POST /appointments            | `https://9zd1216kt4.execute-api.us-east-1.amazonaws.com/dev/appointments`             |
-| GET /appointments/{insuredId} | `https://9zd1216kt4.execute-api.us-east-1.amazonaws.com/dev/appointments/{insuredId}` |
-
----
-
 ## Diferencias clave vs ejecución local
 
 | Aspecto          | Local (LocalStack)          | AWS real                  |
@@ -405,48 +397,6 @@ aws rds describe-db-instances \
 | URL HTTP         | `http://localhost:3001`     | API Gateway URL           |
 | Deploy           | no aplica                   | `npx serverless deploy`   |
 | Runners          | `tsx scripts/dev-server.ts` | Lambdas en AWS            |
-
----
-
-## Problemas conocidos y soluciones
-
-### ❌ `Runtime.ImportModuleError: Cannot find module 'createAppointment'`
-
-**Síntoma:** Lambda lanza error inmediatamente al recibir la primera request, sin ejecutar ningún código de negocio.
-
-**Causa:** `serverless-esbuild` tiene un bug con archivos TypeScript cuyo nombre contiene `.handler` (p.ej. `createAppointment.handler.ts`). El bundle se genera como `createAppointment.handler.js`, pero Lambda interpreta el handler configurado `createAppointment.handler` como:
-
-- módulo → `createAppointment`
-- export → `handler`
-
-Entonces busca `createAppointment.js` que no existe en el zip.
-
-**Solución aplicada:** Los archivos handler fueron renombrados eliminando `.handler` del nombre de archivo:
-
-| Antes                                | Después                      |
-| ------------------------------------ | ---------------------------- |
-| `createAppointment.handler.ts`       | `createAppointment.ts`       |
-| `getAppointments.handler.ts`         | `getAppointments.ts`         |
-| `appointmentPe.handler.ts`           | `appointmentPe.ts`           |
-| `appointmentCl.handler.ts`           | `appointmentCl.ts`           |
-| `appointmentConfirmation.handler.ts` | `appointmentConfirmation.ts` |
-
-Y en `serverless.yml` los handlers se definen sin el `.handler` del nombre de archivo:
-
-```yaml
-# ✅ Correcto
-handler: src/functions/appointment/infrastructure/http/createAppointment.handler
-
-# ❌ Incorrecto (causaba el error)
-handler: src/functions/appointment/infrastructure/http/createAppointment.handler.handler
-```
-
-Además se agregó en `serverless.yml` para que cada Lambda tenga su propio zip:
-
-```yaml
-package:
-  individually: true
-```
 
 ---
 

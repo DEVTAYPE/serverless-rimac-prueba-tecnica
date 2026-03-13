@@ -7,13 +7,13 @@ import { IAppointmentConfirmedEvent } from "@shared/types";
 
 //  Adaptador EventBridge para appointment_cl.
 //
-//  Publica el evento 'appointment-confirmed' al bus de eventos default de AWS.
-//  EventBridge enruta el evento mediante la regla appointment-confirmedRule
+//  Publica el evento 'appointment_confirmed' al bus de eventos default de AWS.
+//  EventBridge enruta el evento mediante la regla appointment_confirmedRule
 //  hacia la SQS de confirmación, donde el lambda 'appointment' lo consume
 //  para actualizar el estado en DynamoDB a 'completed'.
 //
 //  source: "rimac.appointment"
-//  detail-type: "appointment-confirmed"
+//  detail-type: "appointment_confirmed"
 //
 export class EventBridgeConfirmationPublisher implements IEventBridgePublisher {
   private readonly client: EventBridgeClient;
@@ -30,7 +30,7 @@ export class EventBridgeConfirmationPublisher implements IEventBridgePublisher {
         Entries: [
           {
             Source: "rimac.appointment",
-            DetailType: "appointment-confirmed",
+            DetailType: "appointment_confirmed",
             Detail: JSON.stringify(event),
             EventBusName: "default",
           },

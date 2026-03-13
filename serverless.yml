@@ -65,7 +65,8 @@ custom:
     sourcemap: true
     target: node20
     platform: node
-    # AWS SDK v3 está disponible en el runtime de Node 20 en Lambda
+    tsconfig: ./tsconfig.json
+    format: cjs
     exclude:
       - "@aws-sdk/*"
 
@@ -296,7 +297,7 @@ resources:
         QueueName: ${self:service}-sqs-confirmation-${self:provider.stage}
         VisibilityTimeout: 60
 
-    # EventBridge - Regla para evento AppointmentConfirmed
+    # EventBridge - Regla para evento appointment-confirmed
     # appointment_pe / appointment_cl → EventBridge → SQS → appointment
     AppointmentConfirmedRule:
       Type: AWS::Events::Rule
@@ -307,7 +308,7 @@ resources:
           source:
             - rimac.appointment
           detail-type:
-            - AppointmentConfirmed
+            - appointment_confirmed
         State: ENABLED
         Targets:
           - Arn: !GetAtt AppointmentConfirmationQueue.Arn

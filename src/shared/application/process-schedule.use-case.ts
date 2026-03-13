@@ -38,7 +38,7 @@ export class ProcessScheduleUseCase {
     await this.scheduleRepository.saveSchedule(appointment);
 
     // 2. Publicar evento de confirmación a EventBridge
-    //    EventBridge enruta: appointment-confirmed → SQS confirmation → lambda appointment
+    //    EventBridge enruta: appointment_confirmed → SQS confirmation → lambda appointment
     await this.eventBridgePublisher.publishConfirmation({
       appointment_id: message.appointment_id,
       insured_id: message.insured_id,

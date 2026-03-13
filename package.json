@@ -1,7 +1,6 @@
 {
   "name": "serverless-rimac-prueba-tecnica",
   "version": "1.0.0",
-  "type": "module",
   "description": "",
   "scripts": {
     "deploy": "serverless deploy",
